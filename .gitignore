@@ -1,0 +1,31 @@
+﻿# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+
+# Database & user data
+*.db
+notes.db
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Electron cache
+.electron-cache/
+
+# Build output
+release/
