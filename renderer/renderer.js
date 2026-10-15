@@ -77,7 +77,75 @@ function getFirstLine(md) {
   return first || '\u65E0\u6807\u9898';
 }
 
-var THEME_EMOJIS = { cute:'\u{1F338}', minimal:'\u{1F4DD}', hellokitty:'\u{1F380}', ocean:'\u{1F30A}', forest:'\u{1F33F}', sunset:'\u{1F305}', lavender:'\u{1F49C}', dark:'\u{1F5A4}' };
+var THEME_EMOJIS = { cute:'\u{1F338}', minimal:'\u{1F4DD}', hellokitty:'\u{1F380}', ocean:'\u{1F30A}', forest:'\u{1F33F}', sunset:'\u{1F305}', lavender:'\u{1F49C}', dark:'\u{1F5A4}', glass:'\u{1FA9F}' };
+
+function parseThemeColor(value) {
+  var color = value.trim();
+  if (color === 'transparent') return [0, 0, 0, 0];
+  if (color[0] === '#') {
+    var hex = color.slice(1);
+    if (hex.length === 3) hex = hex.split('').map(function(c) { return c + c; }).join('');
+    return [0, 2, 4].map(function(i) { return parseInt(hex.slice(i, i + 2), 16); }).concat(1);
+  }
+  var match = color.match(/^rgba?\(([^)]+)\)$/);
+  if (!match) return [255, 255, 255, 1];
+  var values = match[1].split(',').map(function(part) { return Number(part.trim()); });
+  return [values[0], values[1], values[2], values.length === 4 ? values[3] : 1];
+}
+
+function compositeColor(color, behind) {
+  return behind.map(function(bg) {
+    return bg.map(function(channel, i) { return color[i] * color[3] + channel * (1 - color[3]); });
+  });
+}
+
+function colorLuminance(rgb) {
+  var channels = rgb.map(function(value) {
+    var c = value / 255;
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
+function minContrast(hex, backgrounds) {
+  var foreground = colorLuminance(parseThemeColor(hex));
+  return Math.min.apply(null, backgrounds.map(function(bg) {
+    var background = colorLuminance(bg);
+    return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+  }));
+}
+
+function bestTextColor(backgrounds, dark, light) {
+  return minContrast(dark, backgrounds) >= minContrast(light, backgrounds) ? dark : light;
+}
+
+function applyTheme(theme) {
+  state.currentTheme = theme;
+  dom.body.className = 'theme-' + theme;
+  var css = getComputedStyle(dom.body);
+  var getColor = function(name) { return parseThemeColor(css.getPropertyValue(name)); };
+  var desktop = [[0, 0, 0], [255, 255, 255]];
+  var root = compositeColor(getColor('--bg-root'), desktop);
+  var surface = compositeColor(getColor('--bg-surface'), root);
+  var sidebar = compositeColor(getColor('--bg-sidebar'), root);
+  var content = surface.concat(sidebar);
+  var primary = bestTextColor(content, '#000000', '#FFFFFF');
+  var lightText = primary === '#FFFFFF';
+  var secondary = lightText ? '#E8F2F5' : '#26323C';
+  var muted = lightText ? '#D5E5E9' : '#3A4852';
+  dom.body.style.setProperty('--text-primary', primary);
+  dom.body.style.setProperty('--text-secondary', minContrast(secondary, content) >= 4.5 ? secondary : primary);
+  dom.body.style.setProperty('--text-muted', minContrast(muted, content) >= 4.5 ? muted : primary);
+  dom.body.style.setProperty('--titlebar-fg', bestTextColor(compositeColor(getColor('--titlebar-bg'), root), '#000000', '#FFFFFF'));
+  dom.body.style.setProperty('--statusbar-fg', bestTextColor(compositeColor(getColor('--statusbar-bg'), root), '#000000', '#FFFFFF'));
+  dom.body.style.setProperty('--tag-fg', bestTextColor(compositeColor(getColor('--tag-bg'), content), '#000000', '#FFFFFF'));
+  dom.body.style.setProperty('--accent-fg', bestTextColor(compositeColor(getColor('--accent'), root), '#000000', '#FFFFFF'));
+  dom.themeDots.querySelectorAll('.tdot').forEach(function(dot) {
+    var active = dot.dataset.theme === theme;
+    dot.classList.toggle('active', active);
+    dot.setAttribute('aria-pressed', String(active));
+  });
+}
 
 // ============ LOAD ============
 async function loadNotes() {
@@ -459,10 +527,8 @@ function bindEvents() {
   // Theme dots
   dom.themeDots.addEventListener('click', async function(e) {
     var dot = e.target.closest('.tdot'); if (!dot) return;
-    var nt = dot.dataset.theme; state.currentTheme = nt;
-    dom.body.className = 'theme-' + nt;
-    dom.themeDots.querySelectorAll('.tdot').forEach(function(d) { d.classList.remove('active'); });
-    dot.classList.add('active');
+    var nt = dot.dataset.theme;
+    applyTheme(nt);
     await window.api.theme.set(nt);
   });
 
@@ -526,10 +592,8 @@ function bindEvents() {
 // ============ INIT ============
 async function init() {
   try { state.currentTheme = await window.api.theme.get(); } catch(e) { state.currentTheme = 'cute'; }
-  dom.body.className = 'theme-' + state.currentTheme;
-  dom.themeDots.querySelectorAll('.tdot').forEach(function(d) { d.classList.remove('active'); });
-  var activeDot = dom.themeDots.querySelector('[data-theme="' + state.currentTheme + '"]');
-  if (activeDot) activeDot.classList.add('active');
+  if (!dom.themeDots.querySelector('[data-theme="' + state.currentTheme + '"]')) state.currentTheme = 'cute';
+  applyTheme(state.currentTheme);
   bindEvents();
   await loadCollections(); await loadNotes(); await loadTags(); await loadActiveDates();
 }
