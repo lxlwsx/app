@@ -29,3 +29,6 @@ npm-debug.log*
 
 # Build output
 release/
+
+# 与便签应用无关的 PPT 构建目录
+.ppt_build/
