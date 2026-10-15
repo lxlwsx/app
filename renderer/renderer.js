@@ -140,6 +140,7 @@ function applyTheme(theme) {
   dom.body.style.setProperty('--statusbar-fg', bestTextColor(compositeColor(getColor('--statusbar-bg'), root), '#000000', '#FFFFFF'));
   dom.body.style.setProperty('--tag-fg', bestTextColor(compositeColor(getColor('--tag-bg'), content), '#000000', '#FFFFFF'));
   dom.body.style.setProperty('--accent-fg', bestTextColor(compositeColor(getColor('--accent'), root), '#000000', '#FFFFFF'));
+  dom.body.style.setProperty('--danger-fg', bestTextColor(compositeColor(getColor('--danger'), root), '#000000', '#FFFFFF'));
   dom.themeDots.querySelectorAll('.tdot').forEach(function(dot) {
     var active = dot.dataset.theme === theme;
     dot.classList.toggle('active', active);
